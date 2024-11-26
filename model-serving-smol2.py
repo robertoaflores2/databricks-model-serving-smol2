@@ -9,46 +9,73 @@ import mlflow
 from mlflow.models.signature import ModelSignature
 from mlflow.types import Schema, ColSpec
 import pandas as pd
+import logging
 
 # COMMAND ----------
+
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# COMMAND ----------
+
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class SmolLM2Model(mlflow.pyfunc.PythonModel):
 
     def load_context(self, context):
-        # Load the tokenizer and model
-        self.tokenizer = AutoTokenizer.from_pretrained("HuggingFaceTB/SmolLM2-1.7B-Instruct")
-        self.model = AutoModelForCausalLM.from_pretrained("HuggingFaceTB/SmolLM2-1.7B-Instruct")
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
+        logger.debug("Loading tokenizer and model.")
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained("HuggingFaceTB/SmolLM2-1.7B-Instruct")
+            self.model = AutoModelForCausalLM.from_pretrained("HuggingFaceTB/SmolLM2-1.7B-Instruct")
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.model.to(self.device)
+            logger.info("Model loaded successfully.")
+        except Exception as e:
+            logger.error("Error loading model: %s", e)
+            raise
 
     def predict(self, context, model_input):
-        # Ensure the input is a DataFrame with a 'prompt' column
-        if 'prompt' not in model_input.columns:
-            raise ValueError("Input DataFrame must contain a 'prompt' column.")
-        
-        # Tokenize the input prompts
-        inputs = self.tokenizer(
-            model_input['prompt'].tolist(),
-            padding=True,
-            truncation=True,
-            return_tensors="pt"
-        ).to(self.device)
+        logger.debug("Received input for prediction.")
+        try:
+            if not isinstance(model_input, pd.DataFrame):
+                raise ValueError("Input must be a pandas DataFrame.")
+            if 'prompt' not in model_input.columns:
+                raise ValueError("Input DataFrame must contain a 'prompt' column.")
+            if model_input['prompt'].isnull().any():
+                raise ValueError("Null values found in 'prompt' column.")
 
-        # Generate responses
-        outputs = self.model.generate(
-            **inputs,
-            max_new_tokens=50,
-            temperature=0.2,
-            top_p=0.9,
-            do_sample=True
-        )
+            inputs = self.tokenizer(
+                model_input['prompt'].tolist(),
+                padding=True,
+                truncation=True,
+                return_tensors="pt"
+            ).to(self.device)
 
-        # Decode the responses
-        responses = [self.tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
+            outputs = self.model.generate(
+                input_ids=inputs['input_ids'],
+                attention_mask=inputs['attention_mask'],
+                max_new_tokens=50,
+                temperature=0.7,
+                top_p=0.9,
+                do_sample=True
+            )
 
-        # Return the responses as a DataFrame
-        return pd.DataFrame({'generated_text': responses})
+            responses = [self.tokenizer.decode(output, skip_special_tokens=True) for output in outputs]
+            logger.info("Generated responses: %s", responses)
 
+            return pd.DataFrame({'generated_text': responses})
+        except Exception as e:
+            logger.error("Error during prediction: %s", e)
+            raise
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC CREATE CATALOG IF NOT EXISTS dbacademy_labuser7497544_1732645016_vocareum_com
 
 # COMMAND ----------
 
@@ -82,3 +109,12 @@ with mlflow.start_run():
         input_example=input_example,
         registered_model_name=model_name
     )
+
+# COMMAND ----------
+
+# Example usage
+model = SmolLM2Model()
+model.load_context(None)
+input_df = pd.DataFrame({'prompt': ["What is the capital of France?"]})
+output_df = model.predict(None, input_df)
+print(output_df)
