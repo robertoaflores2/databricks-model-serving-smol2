@@ -64,10 +64,24 @@ class SmolLM2Wrapper(mlflow.pyfunc.PythonModel):
 
 # COMMAND ----------
 
+# MAGIC %sql
+# MAGIC CREATE CATALOG IF NOT EXISTS dbacademy_labuser7497544_1732645016_vocareum_com
+# MAGIC
+# MAGIC
+
+# COMMAND ----------
+
 import mlflow
 
-# Set the MLflow tracking URI to use Unity Catalog
-mlflow.set_tracking_uri("databricks-uc")
+# Correct: Set the registry URI to 'databricks-uc' for Unity Catalog
+mlflow.set_registry_uri("databricks-uc")
+
+# Optionally, set the tracking URI to 'databricks' or leave it as default
+mlflow.set_tracking_uri("databricks")  # Optional; you can omit this line if 'databricks' is the default
+
+print("Current Tracking URI:", mlflow.get_tracking_uri())
+print("Current Registry URI:", mlflow.get_registry_uri())
+
 
 # Define the model name with Unity Catalog format
 catalog_name = "dbacademy_labuser7497544_1732645016_vocareum_com"
@@ -76,6 +90,14 @@ model_name = "SmolLM2"
 
 full_model_name = f"{catalog_name}.{schema_name}.{model_name}"
 
+# Define the model signature (if not already defined)
+from mlflow.models.signature import ModelSignature
+from mlflow.types import Schema, ColSpec
+
+input_schema = Schema([ColSpec("string", "text")])
+output_schema = Schema([ColSpec("string")])
+signature = ModelSignature(inputs=input_schema, outputs=output_schema)
+
 # Log and register the model
 with mlflow.start_run():
     mlflow.pyfunc.log_model(
@@ -83,12 +105,6 @@ with mlflow.start_run():
         registered_model_name=full_model_name,
         python_model=SmolLM2Wrapper(model, tokenizer),
         code_paths=[],  # Include any additional code if necessary
-        dependencies=["transformers", "torch"]
+        pip_requirements=["transformers", "torch"],
+        signature=signature  # Ensure you include the model signature
     )
-
-
-# COMMAND ----------
-# MAGIC %sql
-# MAGIC CREATE CATALOG IF NOT EXISTS dbacademy_labuser7497544_1732645016_vocareum_com
-
-
