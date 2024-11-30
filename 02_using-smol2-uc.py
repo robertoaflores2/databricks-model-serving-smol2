@@ -30,7 +30,7 @@ model_uri = f"models:/{full_model_name}/{model_version}"
 # COMMAND ----------
 
 import mlflow.pyfunc
-model_version = "2"  # Replace with your model's version number
+model_version = "6"  # Replace with your model's version number
 model_uri = f"models:/{full_model_name}/{model_version}"
 
 loaded_model = mlflow.pyfunc.load_model(model_uri)
@@ -41,7 +41,7 @@ loaded_model = mlflow.pyfunc.load_model(model_uri)
 import pandas as pd
 
 # Example input text
-input_text = "What is the capital of France?"
+input_text = "what is the most popular anime from the 90s?"
 
 # Create a DataFrame with a column named 'text' (as per the model signature)
 input_data = pd.DataFrame({'text': [input_text]})

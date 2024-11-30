@@ -36,8 +36,14 @@ class SmolLM2Wrapper(mlflow.pyfunc.PythonModel):
 
     def load_context(self, context):
         import torch
+        import transformers
+        import accelerate
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
+        # Log the versions
+        print("Transformers version:", transformers.__version__)
+        print("Torch version:", torch.__version__)
+        print("Accelerate version:", accelerate.__version__)
 
     def predict(self, context, model_input):
         # Extract the list of input texts
@@ -129,7 +135,11 @@ with mlflow.start_run():
         artifact_path="smollm2_model",
         registered_model_name=full_model_name,
         python_model=SmolLM2Wrapper(model, tokenizer),
-        code_paths=[],  # Include any additional code if necessary
-        pip_requirements=["transformers", "torch"],
-        signature=signature  # Ensure you include the model signature
-    )
+        code_paths=[],
+        pip_requirements=[
+            "mlflow==2.18.0",
+            "transformers==4.41.2",
+            "torch>=2.1.0",
+            "accelerate>=0.31.0" 
+        ],
+        signature=signature)
