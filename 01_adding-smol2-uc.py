@@ -137,8 +137,9 @@ with mlflow.start_run():
         python_model=SmolLM2Wrapper(model, tokenizer),
         code_paths=[],
         pip_requirements=[
-            "transformers>=4.46.3",
+            "mlflow==2.18.0",
+            "transformers==4.41.2",
             "torch>=2.1.0",
-            "accelerate>=1.1.0" 
+            "accelerate>=0.31.0" 
         ],
         signature=signature)
