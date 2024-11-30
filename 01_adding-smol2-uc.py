@@ -26,6 +26,8 @@ import torch
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+import mlflow.pyfunc
+
 class SmolLM2Wrapper(mlflow.pyfunc.PythonModel):
 
     def __init__(self, model, tokenizer):
@@ -38,29 +40,52 @@ class SmolLM2Wrapper(mlflow.pyfunc.PythonModel):
         self.model.to(self.device)
 
     def predict(self, context, model_input):
-        # Assuming model_input is a DataFrame with a 'text' column
+        # Extract the list of input texts
         texts = model_input['text'].tolist()
+        
+        # Prepare messages in the format expected by the model
+        messages_list = [[{"role": "user", "content": text}] for text in texts]
+        
+        # Apply the chat template to each message
+        input_texts = [self.tokenizer.apply_chat_template(messages, tokenize=False) for messages in messages_list]
+        
+        # Tokenize the input texts
         inputs = self.tokenizer(
-            texts,
+            input_texts,
             return_tensors="pt",
             padding=True,
             truncation=True,
-            max_length=512
+            max_length=1024  # Increase if needed
         ).to(self.device)
 
+        # Generate outputs
         outputs = self.model.generate(
             **inputs,
-            max_new_tokens=50,
-            temperature=0.2,
+            max_new_tokens=256,  # Adjust as needed
+            temperature=0.7,
             top_p=0.9,
             do_sample=True
         )
 
+        # Decode the outputs
         decoded_outputs = self.tokenizer.batch_decode(
             outputs,
             skip_special_tokens=True
         )
-        return decoded_outputs
+        
+        # Post-process the outputs to extract the assistant's reply
+        final_outputs = []
+        for output in decoded_outputs:
+            # Split the output into turns
+            splits = output.split("<|assistant|>")
+            if len(splits) > 1:
+                assistant_reply = splits[-1].strip()
+                final_outputs.append(assistant_reply)
+            else:
+                final_outputs.append(output.strip())
+        
+        return final_outputs
+
 
 # COMMAND ----------
 
